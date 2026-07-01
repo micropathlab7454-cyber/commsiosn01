@@ -1,0 +1,6 @@
+{
+  "name": "Micro Pathology Lab",
+  "description": "A secure offline-first pathology laboratory management application with database backup/restore, doctor monthly statement generator, and secure QR-coded PDF sharing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
