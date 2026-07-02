@@ -121,14 +121,14 @@ object PdfGenerator {
         val totalOtherAmount = entries.sumOf { it.otherAmount }
 
         // Table configurations
-        val colDateWidth = 65
-        val colNameWidth = 105
-        val colAgeWidth = 30
-        val colTestWidth = 75
-        val colAmountWidth = 60
-        val colDocAmountWidth = 60
+        val colDateWidth = 55
+        val colNameWidth = 95
+        val colAgeWidth = 25
+        val colTestWidth = 120
+        val colAmountWidth = 50
+        val colDocAmountWidth = 55
         val colLabChargeWidth = 55
-        val colOtherWidth = 60
+        val colOtherWidth = 55
 
         val colXDate = leftMargin
         val colXName = colXDate + colDateWidth
@@ -226,6 +226,13 @@ object PdfGenerator {
             
             // Draw grid lines
             canv.drawRect(leftMargin.toFloat(), currentY.toFloat(), rightMargin.toFloat(), (currentY + 20).toFloat(), linePaint)
+            canv.drawLine(colXName.toFloat(), currentY.toFloat(), colXName.toFloat(), (currentY + 20).toFloat(), linePaint)
+            canv.drawLine(colXAge.toFloat(), currentY.toFloat(), colXAge.toFloat(), (currentY + 20).toFloat(), linePaint)
+            canv.drawLine(colXTest.toFloat(), currentY.toFloat(), colXTest.toFloat(), (currentY + 20).toFloat(), linePaint)
+            canv.drawLine(colXAmount.toFloat(), currentY.toFloat(), colXAmount.toFloat(), (currentY + 20).toFloat(), linePaint)
+            canv.drawLine(colXDocAmount.toFloat(), currentY.toFloat(), colXDocAmount.toFloat(), (currentY + 20).toFloat(), linePaint)
+            canv.drawLine(colXLabCharge.toFloat(), currentY.toFloat(), colXLabCharge.toFloat(), (currentY + 20).toFloat(), linePaint)
+            canv.drawLine(colXOther.toFloat(), currentY.toFloat(), colXOther.toFloat(), (currentY + 20).toFloat(), linePaint)
             currentY += 20
         }
 
@@ -248,8 +255,13 @@ object PdfGenerator {
         for (i in entries.indices) {
             val entry = entries[i]
             
+            val testLines = wrapText(entry.test, textPaint, (colTestWidth - 8).toFloat())
+            val nameLines = wrapText(entry.patientName, textPaint, (colNameWidth - 8).toFloat())
+            val lineCount = maxOf(testLines.size, nameLines.size, 1)
+            val rowHeight = maxOf(lineCount * 12 + 8, 22)
+
             // Check overflow
-            if (currentY + 20 > bottomMargin - 50) {
+            if (currentY + rowHeight > bottomMargin - 50) {
                 // Finish current page
                 drawPageFooter(canvas, pageNumber)
                 pdfDocument.finishPage(page)
@@ -265,19 +277,54 @@ object PdfGenerator {
                 textPaint.textSize = 8.5f
             }
 
-            val textY = (currentY + 14).toFloat()
-            canvas.drawText(entry.date, (colXDate + 4).toFloat(), textY, textPaint)
-            canvas.drawText(entry.patientName, (colXName + 4).toFloat(), textY, textPaint)
-            canvas.drawText(entry.age.toString(), (colXAge + 4).toFloat(), textY, textPaint)
-            canvas.drawText(entry.test, (colXTest + 4).toFloat(), textY, textPaint)
-            canvas.drawText("₹${entry.amount}", (colXAmount + 4).toFloat(), textY, textPaint)
-            canvas.drawText("₹${entry.doctorAmount}", (colXDocAmount + 4).toFloat(), textY, textPaint)
-            canvas.drawText("₹${entry.labCharge}", (colXLabCharge + 4).toFloat(), textY, textPaint)
-            canvas.drawText("₹${entry.otherAmount}", (colXOther + 4).toFloat(), textY, textPaint)
+            // Draw background alternating row color for Excel like professional style
+            if (i % 2 == 1) {
+                val rowBgPaint = Paint().apply {
+                    color = Color.rgb(248, 248, 248)
+                    style = Paint.Style.FILL
+                }
+                canvas.drawRect(leftMargin.toFloat(), currentY.toFloat(), rightMargin.toFloat(), (currentY + rowHeight).toFloat(), rowBgPaint)
+            }
+
+            val centerY = currentY + (rowHeight - 8.5f) / 2f + 7.5f
+            canvas.drawText(entry.date, (colXDate + 4).toFloat(), centerY.toFloat(), textPaint)
+            
+            // Draw Patient Name (wrapped)
+            val nameStartY = currentY + (rowHeight - (nameLines.size * 10f)) / 2f + 8f
+            for (lineIndex in nameLines.indices) {
+                canvas.drawText(nameLines[lineIndex], (colXName + 4).toFloat(), (nameStartY + lineIndex * 10f).toFloat(), textPaint)
+            }
+
+            canvas.drawText(entry.age.toString(), (colXAge + 4).toFloat(), centerY.toFloat(), textPaint)
+            
+            // Draw Test Name (wrapped)
+            val testStartY = currentY + (rowHeight - (testLines.size * 10f)) / 2f + 8f
+            for (lineIndex in testLines.indices) {
+                canvas.drawText(testLines[lineIndex], (colXTest + 4).toFloat(), (testStartY + lineIndex * 10f).toFloat(), textPaint)
+            }
+
+            canvas.drawText("₹${formatAmount(entry.amount)}", (colXAmount + 4).toFloat(), centerY.toFloat(), textPaint)
+            canvas.drawText("₹${formatAmount(entry.doctorAmount)}", (colXDocAmount + 4).toFloat(), centerY.toFloat(), textPaint)
+            canvas.drawText("₹${formatAmount(entry.labCharge)}", (colXLabCharge + 4).toFloat(), centerY.toFloat(), textPaint)
+            canvas.drawText("₹${formatAmount(entry.otherAmount)}", (colXOther + 4).toFloat(), centerY.toFloat(), textPaint)
 
             // Draw divider between rows
-            canvas.drawLine(leftMargin.toFloat(), (currentY + 20).toFloat(), rightMargin.toFloat(), (currentY + 20).toFloat(), linePaint)
-            currentY += 20
+            canvas.drawLine(leftMargin.toFloat(), (currentY + rowHeight).toFloat(), rightMargin.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+            
+            // Draw vertical grid lines
+            canvas.drawLine(colXName.toFloat(), currentY.toFloat(), colXName.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+            canvas.drawLine(colXAge.toFloat(), currentY.toFloat(), colXAge.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+            canvas.drawLine(colXTest.toFloat(), currentY.toFloat(), colXTest.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+            canvas.drawLine(colXAmount.toFloat(), currentY.toFloat(), colXAmount.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+            canvas.drawLine(colXDocAmount.toFloat(), currentY.toFloat(), colXDocAmount.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+            canvas.drawLine(colXLabCharge.toFloat(), currentY.toFloat(), colXLabCharge.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+            canvas.drawLine(colXOther.toFloat(), currentY.toFloat(), colXOther.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+            
+            // Outer bounding vertical lines for clean Excel border
+            canvas.drawLine(leftMargin.toFloat(), currentY.toFloat(), leftMargin.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+            canvas.drawLine(rightMargin.toFloat(), currentY.toFloat(), rightMargin.toFloat(), (currentY + rowHeight).toFloat(), linePaint)
+
+            currentY += rowHeight
         }
 
         // Check overflow for TOTAL row
@@ -305,13 +352,27 @@ object PdfGenerator {
         canvas.drawText("-", (colXName + 4).toFloat(), totalTextY, totalTextPaint)
         canvas.drawText("-", (colXAge + 4).toFloat(), totalTextY, totalTextPaint)
         canvas.drawText("-", (colXTest + 4).toFloat(), totalTextY, totalTextPaint)
-        canvas.drawText("₹$totalAmount", (colXAmount + 4).toFloat(), totalTextY, totalTextPaint)
-        canvas.drawText("₹$totalDoctorAmount", (colXDocAmount + 4).toFloat(), totalTextY, totalTextPaint)
-        canvas.drawText("₹$totalLabCharge", (colXLabCharge + 4).toFloat(), totalTextY, totalTextPaint)
-        canvas.drawText("₹$totalOtherAmount", (colXOther + 4).toFloat(), totalTextY, totalTextPaint)
+        canvas.drawText("₹${formatAmount(totalAmount)}", (colXAmount + 4).toFloat(), totalTextY, totalTextPaint)
+        canvas.drawText("₹${formatAmount(totalDoctorAmount)}", (colXDocAmount + 4).toFloat(), totalTextY, totalTextPaint)
+        canvas.drawText("₹${formatAmount(totalLabCharge)}", (colXLabCharge + 4).toFloat(), totalTextY, totalTextPaint)
+        canvas.drawText("₹${formatAmount(totalOtherAmount)}", (colXOther + 4).toFloat(), totalTextY, totalTextPaint)
 
         // Draw divider line under the TOTAL row
         canvas.drawLine(leftMargin.toFloat(), (currentY + 20).toFloat(), rightMargin.toFloat(), (currentY + 20).toFloat(), linePaint)
+
+        // Draw vertical grid lines for TOTAL row
+        canvas.drawLine(colXName.toFloat(), currentY.toFloat(), colXName.toFloat(), (currentY + 20).toFloat(), linePaint)
+        canvas.drawLine(colXAge.toFloat(), currentY.toFloat(), colXAge.toFloat(), (currentY + 20).toFloat(), linePaint)
+        canvas.drawLine(colXTest.toFloat(), currentY.toFloat(), colXTest.toFloat(), (currentY + 20).toFloat(), linePaint)
+        canvas.drawLine(colXAmount.toFloat(), currentY.toFloat(), colXAmount.toFloat(), (currentY + 20).toFloat(), linePaint)
+        canvas.drawLine(colXDocAmount.toFloat(), currentY.toFloat(), colXDocAmount.toFloat(), (currentY + 20).toFloat(), linePaint)
+        canvas.drawLine(colXLabCharge.toFloat(), currentY.toFloat(), colXLabCharge.toFloat(), (currentY + 20).toFloat(), linePaint)
+        canvas.drawLine(colXOther.toFloat(), currentY.toFloat(), colXOther.toFloat(), (currentY + 20).toFloat(), linePaint)
+
+        // Outer bounding vertical lines for clean Excel border
+        canvas.drawLine(leftMargin.toFloat(), currentY.toFloat(), leftMargin.toFloat(), (currentY + 20).toFloat(), linePaint)
+        canvas.drawLine(rightMargin.toFloat(), currentY.toFloat(), rightMargin.toFloat(), (currentY + 20).toFloat(), linePaint)
+
         currentY += 20
 
         // Check if QR code fits on the current page, if not, move to next page
@@ -369,6 +430,39 @@ object PdfGenerator {
             e.printStackTrace()
             pdfDocument.close()
             return null
+        }
+    }
+
+    private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
+        val lines = mutableListOf<String>()
+        var tempText = text
+        while (tempText.isNotEmpty()) {
+            val measuredChars = paint.breakText(tempText, true, maxWidth, null)
+            if (measuredChars <= 0) {
+                lines.add(tempText)
+                break
+            }
+            var chunk = tempText.substring(0, measuredChars)
+            if (measuredChars < tempText.length) {
+                // Try to find a clean break point (space or comma) near the end of the chunk
+                val lastSpace = chunk.lastIndexOf(' ')
+                val lastComma = chunk.lastIndexOf(',')
+                val breakIndex = maxOf(lastSpace, lastComma)
+                if (breakIndex > chunk.length / 2) {
+                    chunk = tempText.substring(0, breakIndex + 1)
+                }
+            }
+            lines.add(chunk.trim())
+            tempText = tempText.substring(chunk.length)
+        }
+        return lines
+    }
+
+    private fun formatAmount(value: Double): String {
+        return if (value % 1.0 == 0.0) {
+            value.toInt().toString()
+        } else {
+            String.format("%.2f", value)
         }
     }
 

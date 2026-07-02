@@ -11,6 +11,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.Dialog
 import com.example.data.model.Doctor
 import com.example.data.model.Entry
@@ -692,11 +695,11 @@ fun HomeScreen(viewModel: LabViewModel) {
         } else {
             // Show up to 3 most recent entries
             val recentEntries = entries.take(3)
-            items(recentEntries) { entry ->
-                PatientEntryListItem(
-                    entry = entry,
-                    onEdit = {},
-                    onDelete = {}
+            item {
+                PatientEntriesTable(
+                    entries = recentEntries,
+                    showActions = false,
+                    showTotal = false
                 )
             }
             item {
@@ -983,11 +986,13 @@ fun EntriesScreen(viewModel: LabViewModel) {
                         }
                     }
 
-                    items(entriesList) { entry ->
-                        PatientEntryListItem(
-                            entry = entry,
-                            onEdit = { editingEntry = entry },
-                            onDelete = { viewModel.deleteEntry(entry) }
+                    item {
+                        PatientEntriesTable(
+                            entries = entriesList,
+                            showActions = true,
+                            showTotal = true,
+                            onEdit = { editingEntry = it },
+                            onDelete = { viewModel.deleteEntry(it) }
                         )
                     }
                 }
@@ -1004,97 +1009,350 @@ fun EntriesScreen(viewModel: LabViewModel) {
     }
 }
 
+val colDateWidth = 90.dp
+val colNameWidth = 120.dp
+val colAgeWidth = 50.dp
+val colTestWidth = 200.dp
+val colAmountWidth = 85.dp
+val colDocAmountWidth = 100.dp
+val colLabChargeWidth = 100.dp
+val colOtherWidth = 95.dp
+val colActionsWidth = 90.dp
+
 @Composable
-fun PatientEntryListItem(
-    entry: Entry,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+fun TableCell(
+    text: String,
+    width: Dp,
+    isHeader: Boolean = false,
+    isNumeric: Boolean = false,
+    textColor: Color = Color.Unspecified,
+    fontWeight: FontWeight = FontWeight.Normal,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+    onClick: (() -> Unit)? = null
 ) {
-    Card(
+    Box(
+        modifier = Modifier
+            .width(width)
+            .fillMaxHeight()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        contentAlignment = if (isNumeric) Alignment.CenterEnd else Alignment.CenterStart
+    ) {
+        Text(
+            text = text,
+            fontWeight = if (isHeader) FontWeight.Bold else fontWeight,
+            fontSize = if (isHeader) 12.sp else 13.sp,
+            color = if (isHeader) MaterialTheme.colorScheme.onSecondaryContainer else textColor,
+            maxLines = maxLines,
+            overflow = overflow,
+            textAlign = if (isNumeric) TextAlign.End else TextAlign.Start
+        )
+    }
+}
+
+@Composable
+fun TableHeaderRow(showActions: Boolean) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isSystemInDarkTheme()) Color(0xFF334155) else Color(0xFFF1F5F9)
-        ),
-        shape = RoundedCornerShape(20.dp)
+            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f))
+            .height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        TableCell(text = "Date", width = colDateWidth, isHeader = true)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "Patient Name", width = colNameWidth, isHeader = true)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "Age", width = colAgeWidth, isHeader = true, isNumeric = true)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "Test Name", width = colTestWidth, isHeader = true)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "Total Amt", width = colAmountWidth, isHeader = true, isNumeric = true)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "Doc Share", width = colDocAmountWidth, isHeader = true, isNumeric = true)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "Lab Chg", width = colLabChargeWidth, isHeader = true, isNumeric = true)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "Other Amt", width = colOtherWidth, isHeader = true, isNumeric = true)
+        
+        if (showActions) {
+            Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Box(
+                modifier = Modifier
+                    .width(colActionsWidth)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Actions",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+    }
+    Divider(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+@Composable
+fun TableRow(
+    entry: Entry,
+    showActions: Boolean,
+    onEdit: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
+    onRowClick: () -> Unit,
+    backgroundColor: Color = Color.Unspecified
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(backgroundColor)
+            .clickable(onClick = onRowClick)
+            .height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TableCell(text = entry.date, width = colDateWidth)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        TableCell(text = entry.patientName, width = colNameWidth, fontWeight = FontWeight.SemiBold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        TableCell(text = entry.age.toString(), width = colAgeWidth, isNumeric = true)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        TableCell(
+            text = entry.test,
+            width = colTestWidth,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        TableCell(text = "₹${entry.amount.toInt()}", width = colAmountWidth, isNumeric = true, textColor = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        TableCell(text = "₹${entry.doctorAmount.toInt()}", width = colDocAmountWidth, isNumeric = true, textColor = Color(0xFFC62828), fontWeight = FontWeight.SemiBold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        TableCell(text = "₹${entry.labCharge.toInt()}", width = colLabChargeWidth, isNumeric = true, textColor = Color(0xFF1565C0), fontWeight = FontWeight.SemiBold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        TableCell(text = "₹${entry.otherAmount.toInt()}", width = colOtherWidth, isNumeric = true, textColor = Color(0xFFEF6C00), fontWeight = FontWeight.SemiBold)
+        
+        if (showActions) {
+            Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .width(colActionsWidth)
+                    .fillMaxHeight()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = entry.patientName,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Age: ${entry.age}  |  Date: ${entry.date}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                IconButton(
+                    onClick = { onEdit?.invoke() },
+                    modifier = Modifier.size(28.dp)
                 ) {
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit patient entry", tint = MaterialTheme.colorScheme.primary)
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete patient entry", tint = MaterialTheme.colorScheme.error)
-                    }
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                 }
-            }
-
-            Divider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Dynamic columns details
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("Test Name", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(entry.test, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Total Amt", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("₹${entry.amount}", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("Doc Amount", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("₹${entry.doctorAmount}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFFC62828))
-                }
-                Column {
-                    Text("Lab Charge", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("₹${entry.labCharge}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF1565C0))
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Other Amt", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("₹${entry.otherAmount}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFFEF6C00))
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(
+                    onClick = { onDelete?.invoke() },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                 }
             }
         }
     }
+    Divider(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+}
+
+@Composable
+fun TableTotalRow(
+    entries: List<Entry>,
+    showActions: Boolean
+) {
+    val totalAmount = entries.sumOf { it.amount }
+    val totalDocAmount = entries.sumOf { it.doctorAmount }
+    val totalLabCharge = entries.sumOf { it.labCharge }
+    val totalOtherAmount = entries.sumOf { it.otherAmount }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TableCell(text = "TOTAL", width = colDateWidth, fontWeight = FontWeight.Bold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "${entries.size} Pat", width = colNameWidth, fontWeight = FontWeight.Bold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "-", width = colAgeWidth, isNumeric = true, fontWeight = FontWeight.Bold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "-", width = colTestWidth, fontWeight = FontWeight.Bold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "₹${totalAmount.toInt()}", width = colAmountWidth, isNumeric = true, textColor = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "₹${totalDocAmount.toInt()}", width = colDocAmountWidth, isNumeric = true, textColor = Color(0xFFC62828), fontWeight = FontWeight.Bold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "₹${totalLabCharge.toInt()}", width = colLabChargeWidth, isNumeric = true, textColor = Color(0xFF1565C0), fontWeight = FontWeight.Bold)
+        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        TableCell(text = "₹${totalOtherAmount.toInt()}", width = colOtherWidth, isNumeric = true, textColor = Color(0xFFEF6C00), fontWeight = FontWeight.Bold)
+        
+        if (showActions) {
+            Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Box(
+                modifier = Modifier
+                    .width(colActionsWidth)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("-", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+    }
+    Divider(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+@Composable
+fun PatientEntriesTable(
+    entries: List<Entry>,
+    showActions: Boolean = false,
+    showTotal: Boolean = false,
+    onEdit: ((Entry) -> Unit)? = null,
+    onDelete: ((Entry) -> Unit)? = null
+) {
+    var selectedRowEntry by remember { mutableStateOf<Entry?>(null) }
+
+    val totalWidth = colDateWidth + colNameWidth + colAgeWidth + colTestWidth + 
+                     colAmountWidth + colDocAmountWidth + colLabChargeWidth + colOtherWidth +
+                     (if (showActions) colActionsWidth else 0.dp) + 8.dp // padding cushion
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
+            Column(
+                modifier = Modifier.width(totalWidth)
+            ) {
+                TableHeaderRow(showActions = showActions)
+                
+                entries.forEachIndexed { index, entry ->
+                    val bgColor = if (index % 2 == 0) {
+                        MaterialTheme.colorScheme.surface
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                    }
+                    TableRow(
+                        entry = entry,
+                        showActions = showActions,
+                        onEdit = onEdit?.let { { it(entry) } },
+                        onDelete = onDelete?.let { { it(entry) } },
+                        onRowClick = { selectedRowEntry = entry },
+                        backgroundColor = bgColor
+                    )
+                }
+
+                if (showTotal && entries.isNotEmpty()) {
+                    TableTotalRow(entries = entries, showActions = showActions)
+                }
+            }
+        }
+    }
+
+    if (selectedRowEntry != null) {
+        EntryDetailsDialog(
+            entry = selectedRowEntry!!,
+            onDismiss = { selectedRowEntry = null }
+        )
+    }
+}
+
+@Composable
+fun EntryDetailsDialog(
+    entry: Entry,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Patient Entry Details",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Patient Name:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text(entry.patientName, style = MaterialTheme.typography.bodyMedium)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Age / Date:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text("${entry.age} yrs  |  ${entry.date}", style = MaterialTheme.typography.bodyMedium)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Doctor:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text(entry.doctorName, style = MaterialTheme.typography.bodyMedium)
+                }
+                
+                Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Test(s) Conducted:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Text(
+                            text = entry.test,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                
+                Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Total Amount:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text("₹${entry.amount.toInt()}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Doctor Share Amount:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text("₹${entry.doctorAmount.toInt()}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Lab Charge:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text("₹${entry.labCharge.toInt()}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF1565C0), fontWeight = FontWeight.Bold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Other Amount:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text("₹${entry.otherAmount.toInt()}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFEF6C00), fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Close", color = Color.White)
+            }
+        }
+    )
 }
 
 @Composable
@@ -1355,28 +1613,12 @@ fun DoctorMonthlyStatementScreen(viewModel: LabViewModel) {
                 )
             }
 
-            items(filteredEntries) { entry ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(entry.patientName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Test: ${entry.test}  |  ${entry.date}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("₹${entry.amount}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-                            Text("Doc Amt: ₹${entry.doctorAmount}", fontSize = 11.sp, color = Color(0xFFC62828))
-                        }
-                    }
-                }
+            item {
+                PatientEntriesTable(
+                    entries = filteredEntries,
+                    showActions = false,
+                    showTotal = true
+                )
             }
 
             // Summary totals block
